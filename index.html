@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>樂高冒險：積木飛鳥 (LEGO Flappy Bird Extraordinaire)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            color: #fff;
+        }
+        #game-container {
+            position: relative;
+            width: 480px;
+            height: 640px;
+            background: #111;
+            border: 6px solid #ffd700;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            background: #87CEEB;
+        }
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(4px);
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+        .hidden {
+            display: none !important;
+            opacity: 0;
+        }
+        h1 {
+            font-size: 32px;
+            color: #ffcc00;
+            text-shadow: 3px 3px 0px #cc2200, 5px 5px 0px #000;
+            margin-bottom: 5px;
+            text-align: center;
+            font-weight: 900;
+            letter-spacing: 2px;
+        }
+        .subtitle {
+            font-size: 14px;
+            color: #fff;
+            margin-bottom: 30px;
+            background: #cc2200;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            box-shadow: 2px 2px 0px #000;
+        }
+        .btn {
+            background: #ffcc00;
+            color: #000;
+            border: 3px solid #000;
+            padding: 12px 32px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 8px;
+            box-shadow: 0 4px 0px #cc9900;
+            transition: all 0.1s ease;
+            margin: 10px;
+            text-transform: uppercase;
+        }
+        .btn:hover {
+            background: #ffe066;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0px #cc9900;
+        }
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0px #cc9900;
+        }
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 0;
+            width: 100%;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 5;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .hud-item {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 2px solid #ffcc00;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-shadow: 1px 1px 1px #000;
+        }
+        #score-display {
+            font-size: 32px;
+            color: #fff;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 20px;
+            border-radius: 10px;
+            border: 3px solid #fff;
+            box-shadow: 3px 3px 0px #000;
+        }
+        /* Active Powerup Banner */
+        #powerup-announcer {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ffcc00;
+            color: #000;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            border: 2px solid #000;
+            box-shadow: 2px 2px 0px rgba(0,0,0,0.3);
+            display: none;
+            z-index: 5;
+            animation: pulse 1s infinite alternate;
+        }
+        @keyframes pulse {
+            from { transform: translateX(-50%) scale(1); }
+            to { transform: translateX(-50%) scale(1.05); }
+        }
+        /* Instructions / Credits */
+        .instructions {
+            color: #ddd;
+            font-size: 14px;
+            text-align: center;
+            line-height: 1.6;
+            margin-top: 20px;
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px dashed #fff;
+        }
+        .game-over-stats {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 15px;
+            width: 80%;
+            margin-bottom: 20px;
+            border: 2px solid #ffcc00;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 16px;
+        }
+        .stat-val {
+            font-weight: bold;
+            color: #ffcc00;
+        }
+        /* Audio Controls */
+        #audio-toggle {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            background: rgba(0,0,0,0.7);
+            border: 2px solid #ffcc00;
+            color: #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            z-index: 12;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- HUD -->
+        <div id="hud">
+            <div class="hud-item" style="color: #ffcc00;">🪙 <span id="coins-count">0</span></div>
+            <div id="score-display">0</div>
+            <div class="hud-item" style="color: #00ffcc;">🏆 <span id="high-score-hud">0</span></div>
+        </div>
+
+        <!-- Powerup Banner -->
+        <div id="powerup-announcer">無敵狀態 🚀 (5s)</div>
+
+        <!-- Audio Control -->
+        <button id="audio-toggle">🔊</button>
+
+        <!-- Main Canvas -->
+        <canvas id="gameCanvas" width="480" height="640"></canvas>
+
+        <!-- Start Overlay -->
+        <div id="start-overlay" class="overlay">
+            <h1>積木飛鳥</h1>
+            <div class="subtitle">LEGO® STYLE ADVENTURE</div>
+            <button class="btn" id="start-btn">開始冒險</button>
+            <div class="instructions">
+                <strong>【玩法操作】</strong><br>
+                點擊畫面 或 按下 <strong>空白鍵(Space)</strong> 使飛鳥向上飛行。<br>
+                穿過樂高積木柱子得分，收集金幣並獲取特殊道具！<br>
+                <span style="color: #00ffcc;">🌟 綠色：縮小 | 🚀 黃色：無敵衝刺 | 🧲 藍色：磁鐵</span>
+            </div>
+        </div>
+
+        <!-- Game Over Overlay -->
+        <div id="game-over-overlay" class="overlay hidden">
+            <h1>冒險結束</h1>
+            <div class="subtitle" style="background: #111;">GAME OVER</div>
+            
+            <div class="game-over-stats">
+                <div class="stat-row"><span>本次得分：</span><span class="stat-val" id="final-score">0</span></div>
+                <div class="stat-row"><span>收集金幣：</span><span class="stat-val" id="final-coins" style="color: #ffd700;">0</span></div>
+                <div class="stat-row"><span>最高紀錄：</span><span class="stat-val" id="best-score" style="color: #00ffcc;">0</span></div>
+            </div>
+
+            <button class="btn" id="restart-btn">再玩一次</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 音效系統 (Web Audio API 獨立生成，不需外部檔案) ---
+        class SoundSystem {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+                this.bgmInterval = null;
+                this.bgmStep = 0;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playTone(freq, type, duration, startTime = 0, vol = 0.1) {
+                if (this.muted || !this.ctx) return;
+                try {
+                    let osc = this.ctx.createOscillator();
+                    let gainNode = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + startTime);
+                    
+                    gainNode.gain.setValueAtTime(vol, this.ctx.currentTime + startTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.00001, this.ctx.currentTime + startTime + duration);
+                    
+                    osc.connect(gainNode);
+                    gainNode.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + startTime);
+                    osc.stop(this.ctx.currentTime + startTime + duration);
+                } catch(e) {}
+            }
+
+            playJump() {
+                this.playTone(400, 'triangle', 0.15, 0, 0.15);
+                this.playTone(600, 'triangle', 0.15, 0.05, 0.1);
+            }
+
+            playCoin() {
+                this.playTone(987.77, 'sine', 0.08, 0, 0.1); // B5
+                this.playTone(1318.51, 'sine', 0.2, 0.06, 0.1); // E6
+            }
+
+            playPowerup() {
+                let now = 0;
+                for(let i=0; i<4; i++) {
+                    this.playTone(523.25 + (i*150), 'sawtooth', 0.1, now, 0.08);
+                    now += 0.07;
+                }
+            }
+
+            playScore() {
+                this.playTone(880, 'sine', 0.1, 0, 0.08);
+            }
+
+            playHit() {
+                this.playTone(150, 'sawtooth', 0.3, 0, 0.3);
+                this.playTone(80, 'triangle', 0.4, 0.1, 0.3);
+            }
+
+            startBGM() {
+                if (this.bgmInterval) clearInterval(this.bgmInterval);
+                // 簡單歡樂的8-bit樂高風循環旋律
+                const melody = [523.25, 587.33, 659.25, 698.46, 783.99, 698.46, 659.25, 587.33];
+                const bass = [261.63, 329.63, 392.00, 329.63];
+                
+                this.bgmInterval = setInterval(() => {
+                    if (this.muted) return;
+                    this.init();
+                    let note = melody[this.bgmStep % melody.length];
+                    let bassNote = bass[Math.floor(this.bgmStep / 2) % bass.length];
+                    
+                    // 播放主旋律
+                    this.playTone(note, 'square', 0.25, 0, 0.02);
+                    // 播放低音伴奏
+                    if(this.bgmStep % 2 === 0) {
+                        this.playTone(bassNote, 'triangle', 0.4, 0, 0.04);
+                    }
+                    this.bgmStep++;
+                }, 250);
+            }
+
+            stopBGM() {
+                if (this.bgmInterval) {
+                    clearInterval(this.bgmInterval);
+                    this.bgmInterval = null;
+                }
+            }
+        }
+
+        const sounds = new SoundSystem();
+
+        // --- 遊戲主程式 ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // DOM 元素
+        const startOverlay = document.getElementById('start-overlay');
+        const gameOverOverlay = document.getElementById('game-over-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const scoreDisplay = document.getElementById('score-display');
+        const coinsCountHud = document.getElementById('coins-count');
+        const highScoreHud = document.getElementById('high-score-hud');
+        const finalScore = document.getElementById('final-score');
+        const finalCoins = document.getElementById('final-coins');
+        const bestScore = document.getElementById('best-score');
+        const powerupAnnouncer = document.getElementById('powerup-announcer');
+        const audioToggle = document.getElementById('audio-toggle');
+
+        // 遊戲狀態常數
+        const STATE_START = 0;
+        const STATE_PLAYING = 1;
+        const STATE_GAMEOVER = 2;
+        let gameState = STATE_START;
+
+        // 全域遊戲變數
+        let score = 0;
+        let coins = 0;
+        let highScore = localStorage.getItem('lego_flappy_highscore') || 0;
+        highScoreHud.textContent = highScore;
+
+        let frameCount = 0;
+        let gameSpeed = 3.5;
+
+        // 實體陣列
+        let bird;
+        let pipes = [];
+        let collectibles = [];
+        let particles = [];
+        let backgroundLayers = [];
+
+        // 道具種類定義
+        const POWERUP_NONE = 0;
+        const POWERUP_SHRINK = 1;   // 綠色：縮小
+        const POWERUP_INVINCIBLE = 2; // 黃色：無敵衝刺
+        const POWERUP_MAGNET = 3;   // 藍色：磁鐵
+
+        // --- 輔助繪圖函式：繪製標準樂高積木凸點 ---
+        function drawLegoBlock(ctx, x, y, width, height, baseColor, shadowColor, lightColor) {
+            // 主體基底
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(x, y, width, height);
+
+            // 邊緣高光與陰影（立體感）
+            ctx.fillStyle = lightColor;
+            ctx.fillRect(x, y, width, 3); // 頂部高光
+            ctx.fillRect(x, y, 3, height); // 左側高光
+
+            ctx.fillStyle = shadowColor;
+            ctx.fillRect(x, y + height - 3, width, 3); // 底部陰影
+            ctx.fillRect(x + width - 3, y, 3, height); // 右側陰影
+
+            // 繪製凸點 (Studs)
+            const studRadius = 5;
+            const studHeight = 4;
+            const studSpacing = 16;
+            
+            // 計算可以放多少個凸點
+            let numStudsX = Math.floor(width / studSpacing);
+            let startX = x + (width - (numStudsX - 1) * studSpacing) / 2;
+
+            for (let i = 0; i < numStudsX; i++) {
+                let sx = startX + i * studSpacing;
+                let sy = y - studHeight;
+                
+                // 只有頂部沒有被其他東西蓋住時才畫凸點
+                if (sy >= -10 && sy <= canvas.height + 10) {
+                    ctx.fillStyle = baseColor;
+                    ctx.fillRect(sx - studRadius, sy, studRadius * 2, studHeight);
+                    // 凸點高光
+                    ctx.fillStyle = lightColor;
+                    ctx.fillRect(sx - studRadius, sy, studRadius, 1);
+                    ctx.fillRect(sx - studRadius, sy, 1, studHeight);
+                    // 凸點陰影
+                    ctx.fillStyle = shadowColor;
+                    ctx.fillRect(sx, sy + studHeight - 1, studRadius, 1);
+                    ctx.fillRect(sx + studRadius - 1, sy, 1, studHeight);
+                }
+            }
+        }
+
+        // --- 背景層級定義 (樂高像素風格拼裝城市) ---
+        class BackgroundLayer {
+            constructor(speedFactor, colorPalette, type) {
+                this.speedFactor = speedFactor;
+                this.palette = colorPalette;
+                this.type = type; // 'skyline', 'clouds', 'ground'
+                this.x = 0;
+                this.elements = [];
+                this.generate();
+            }
+
+            generate() {
+                let currentW = 0;
+                while (currentW < canvas.width * 3) {
+                    if (this.type === 'skyline') {
+                        let h = 100 + Math.random() * 150;
+                        let w = 40 + Math.random() * 60;
+                        this.elements.push({x: currentW, width: w, height: h, windows: Math.random() > 0.3});
+                        currentW += w;
+                    } else if (this.type === 'clouds') {
+                        let h = 30 + Math.random() * 30;
+                        let w = 60 + Math.random() * 80;
+                        let y = 30 + Math.random() * 120;
+                        this.elements.push({x: currentW + Math.random()*100, y: y, width: w, height: h});
+                        currentW += w + 150;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            update() {
+                this.x -= gameSpeed * this.speedFactor;
+                if (this.x <= -canvas.width) {
+                    this.x += canvas.width;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, 0);
+                
+                if (this.type === 'skyline') {
+                    this.elements.forEach(el => {
+                        // 畫大樓積木
+                        drawLegoBlock(ctx, el.x, canvas.height - el.height - 40, el.width, el.height, this.palette.base, this.palette.shadow, this.palette.light);
+                        // 畫窗戶
+                        if (el.windows) {
+                            ctx.fillStyle = '#ffeb3b';
+                            for (let wx = el.x + 8; wx < el.x + el.width - 8; wx += 16) {
+                                for (let wy = canvas.height - el.height - 20; wy < canvas.height - 60; wy += 25) {
+                                    ctx.fillRect(wx, wy, 6, 8);
+                                }
+                            }
+                        }
+                    });
+                } else if (this.type === 'clouds') {
+                    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                    this.elements.forEach(el => {
+                        // 畫圓角樂高雲朵
+                        ctx.fillRect(el.x, el.y, el.width, el.height);
+                        ctx.fillRect(el.x + 10, el.y - 10, el.width - 20, 10);
+                    });
+                }
+                ctx.restore();
+            }
+        }
+
+        // --- 飛鳥類別 (精緻樂高小鳥/飛機外觀) ---
+        class Bird {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = 100;
+                this.y = 250;
+                this.baseRadius = 18;
+                this.radius = this.baseRadius;
+                this.velocity = 0;
+                this.gravity = 0.4;
+                this.jumpStrength = -7.5;
+                this.angle = 0;
+                
+                // 狀態道具相關
+                this.activePowerup = POWERUP_NONE;
+                this.powerupTimer = 0;
+            }
+
+            jump() {
+                this.velocity = this.jumpStrength;
+                sounds.playJump();
+                // 飛入粒子
+                createExplosion(this.x - 10, this.y, '#ffffff', 4);
+            }
+
+            applyPowerup(type, durationFrames) {
+                this.activePowerup = type;
+                this.powerupTimer = durationFrames;
+                sounds.playPowerup();
+
+                if (type === POWERUP_SHRINK) {
+                    this.radius = this.baseRadius * 0.6;
+                } else {
+                    this.radius = this.baseRadius;
+                }
+            }
+
+            update() {
+                // 計時器遞減
+                if (this.powerupTimer > 0) {
+                    this.powerupTimer--;
+                    if (this.powerupTimer === 0) {
+                        this.activePowerup = POWERUP_NONE;
+                        this.radius = this.baseRadius; // 恢復大小
+                    }
+                }
+
+                // 物理運動
+                // 無敵衝刺時不會往下掉
+                if (this.activePowerup === POWERUP_INVINCIBLE) {
+                    this.velocity = 0;
+                    this.y += (250 - this.y) * 0.1; // 慢慢平移到中央安全區
+                } else {
+                    this.velocity += this.gravity;
+                    this.y += this.velocity;
+                }
+
+                // 旋轉角度計算
+                if (this.activePowerup === POWERUP_INVINCIBLE) {
+                    this.angle = 0;
+                } else {
+                    this.angle = Math.min(Math.PI / 4, Math.max(-Math.PI / 7, this.velocity * 0.06));
+                }
+
+                // 碰撞邊界
+                if (this.y + this.radius > canvas.height - 40) {
+                    this.y = canvas.height - 40 - this.radius;
+                    return true; // 觸地死亡
+                }
+                if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.velocity = 0;
+                }
+                return false;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                // 根據道具狀態發光
+                if (this.activePowerup === POWERUP_INVINCIBLE) {
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#ffcc00';
+                    // 噴射粒子
+                    if (frameCount % 2 === 0) {
+                        particles.push(new Particle(this.x - this.radius, this.y + (Math.random() - 0.5) * 20, -8, (Math.random() - 0.5) * 3, '#ff3300', 6, 20));
+                        particles.push(new Particle(this.x - this.radius, this.y + (Math.random() - 0.5) * 20, -6, (Math.random() - 0.5) * 3, '#ffcc00', 4, 15));
+                    }
+                } else if (this.activePowerup === POWERUP_MAGNET) {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#00ffff';
+                } else if (this.activePowerup === POWERUP_SHRINK) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#00ff66';
+                }
+
+                let r = this.radius;
+
+                // 1. 繪製樂高經典紅色主體 (正方形厚重感積木鳥)
+                drawLegoBlock(ctx, -r, -r, r*2, r*1.8, '#e53935', '#b71c1c', '#ef5350');
+
+                // 2. 嘴巴（黃色 2x1 積木外型）
+                drawLegoBlock(ctx, r - 2, -4, r * 0.6, 10, '#ffeb3b', '#fdd835', '#fff59d');
+
+                // 3. 眼睛（圓形 1x1 白眼黑瞳）
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(r * 0.3, -r * 0.3, r * 0.35, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(r * 0.45, -r * 0.3, r * 0.15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 4. 翅膀（藍色積木，拍動動畫效果）
+                let wingYShift = (this.activePowerup === POWERUP_INVINCIBLE) ? 0 : Math.sin(frameCount * 0.4) * 4;
+                drawLegoBlock(ctx, -r * 0.7, -r * 0.1 + wingYShift, r * 0.9, r * 0.7, '#1e88e5', '#1565c0', '#42a5f5');
+
+                ctx.restore();
+            }
+        }
+
+        // --- 障礙物：樂高拼裝積木柱子 ---
+        class Pipe {
+            constructor(x) {
+                this.x = x;
+                this.width = 76;
+                this.gap = 160;
+                // 隨機決定缺口中央高度
+                this.topHeight = 100 + Math.random() * (canvas.height - 40 - this.gap - 200);
+                this.bottomY = this.topHeight + this.gap;
+                this.bottomHeight = canvas.height - 40 - this.bottomY;
+                this.passed = false;
+                
+                // 柱子的隨機顏色主題（繽紛樂高感）
+                const sets = [
+                    { base: '#4caf50', shadow: '#2e7d32', light: '#81c784' }, // 綠
+                    { base: '#ff9800', shadow: '#ef6c00', light: '#ffb74d' }, // 橘
+                    { base: '#9c27b0', shadow: '#6a1b9a', light: '#ba68c8' }  // 紫
+                ];
+                this.color = sets[Math.floor(Math.random() * sets.length)];
+            }
+
+            update() {
+                this.x -= gameSpeed;
+            }
+
+            draw() {
+                // 上半部柱子
+                this.drawSegment(this.x, 0, this.width, this.topHeight, true);
+                // 下半部柱子
+                this.drawSegment(this.x, this.bottomY, this.width, this.bottomHeight, false);
+            }
+
+            drawSegment(x, y, w, h, isTop) {
+                const brickH = 24; // 每一層樂高積木的高度
+                let layers = Math.ceil(h / brickH);
+
+                for (let i = 0; i < layers; i++) {
+                    let currentY = isTop ? (h - (i + 1) * brickH) : (y + i * brickH);
+                    let currentH = brickH;
+
+                    // 邊界修正
+                    if (isTop && currentY < 0) {
+                        currentH += currentY;
+                        currentY = 0;
+                    }
+                    if (!isTop && currentY + brickH > canvas.height - 40) {
+                        currentH = (canvas.height - 40) - currentY;
+                    }
+
+                    if (currentH <= 0) continue;
+
+                    // 最靠近缺口的那一層繪製成稍微寬一點的「柱頭蓋積木」
+                    if (i === 0) {
+                        let capW = w + 8;
+                        let capX = x - 4;
+                        drawLegoBlock(ctx, capX, currentY, capW, currentH, this.color.base, this.color.shadow, this.color.light);
+                    } else {
+                        // 一般柱身，中間橫切兩塊營造拼裝感
+                        drawLegoBlock(ctx, x, currentY, w/2, currentH, this.color.base, this.color.shadow, this.color.light);
+                        drawLegoBlock(ctx, x + w/2, currentY, w/2, currentH, this.color.base, this.color.shadow, this.color.light);
+                    }
+                }
+            }
+
+            collidesWith(bird) {
+                if (bird.activePowerup === POWERUP_INVINCIBLE) return false; // 無敵無視碰撞
+
+                // 簡單 AABB 與 圓形 碰撞
+                let bLeft = bird.x - bird.radius + 3;
+                let bRight = bird.x + bird.radius - 3;
+                let bTop = bird.y - bird.radius + 3;
+                let bBottom = bird.y + bird.radius - 3;
+
+                // 上管碰撞
+                if (bRight > this.x && bLeft < this.x + this.width) {
+                    if (bTop < this.topHeight || bBottom > this.bottomY) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        // --- 收集品：金幣與特殊道具 (漂浮在柱子之間) ---
+        class Collectible {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 0: Coin, 1: Shrink, 2: Invincible, 3: Magnet
+                this.radius = 12;
+                this.baseY = y;
+                this.pulsePhase = Math.random() * Math.PI * 2;
+                this.alive = true;
+            }
+
+            update() {
+                this.x -= gameSpeed;
+                // 浮動動畫效果
+                this.pulsePhase += 0.05;
+                this.y = this.baseY + Math.sin(this.pulsePhase) * 8;
+
+                // 磁鐵道具吸引效果
+                if (bird.activePowerup === POWERUP_MAGNET && this.alive) {
+                    let dx = bird.x - this.x;
+                    let dy = bird.y - this.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 180) { // 磁鐵吸入範圍
+                        this.x += (dx / dist) * 6;
+                        this.y += (dy / dist) * 6;
+                    }
+                }
+
+                // 檢查與鳥的碰撞
+                let dx = bird.x - this.x;
+                let dy = bird.y - this.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < bird.radius + this.radius) {
+                    this.collect();
+                }
+
+                if (this.x < -50) this.alive = false;
+            }
+
+            collect() {
+                this.alive = false;
+                if (this.type === POWERUP_NONE) {
+                    coins++;
+                    coinsCountHud.textContent = coins;
+                    sounds.playCoin();
+                    createExplosion(this.x, this.y, '#ffd700', 8);
+                } else {
+                    let text = "";
+                    if (this.type === POWERUP_SHRINK) {
+                        bird.applyPowerup(POWERUP_SHRINK, 360); // 6秒
+                        text = "縮小積木 🟢 (6s)";
+                    } else if (this.type === POWERUP_INVINCIBLE) {
+                        bird.applyPowerup(POWERUP_INVINCIBLE, 240); // 4秒
+                        text = "無敵衝刺 🚀 (4s)";
+                    } else if (this.type === POWERUP_MAGNET) {
+                        bird.applyPowerup(POWERUP_MAGNET, 480); // 8秒
+                        text = "金幣磁鐵 🧲 (8s)";
+                    }
+                    
+                    // 顯示頂部 Banner
+                    powerupAnnouncer.textContent = text;
+                    powerupAnnouncer.style.display = "block";
+                    createExplosion(this.x, this.y, '#00ffcc', 15);
+                }
+            }
+
+            draw() {
+                if (!this.alive) return;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                if (this.type === POWERUP_NONE) {
+                    // 🪙 金幣：金黃色圓形立體樂高圓鈕
+                    ctx.fillStyle = '#ffd700';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#b78a00';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    // 內圈
+                    ctx.fillStyle = '#ffea00';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius * 0.5, 0, Math.PI*2);
+                    ctx.fill();
+                } else {
+                    // 🎁 道具：正方形發光神秘積木箱
+                    ctx.shadowBlur = 10;
+                    let color = '#fff';
+                    if (this.type === POWERUP_SHRINK) color = '#00ff66';
+                    if (this.type === POWERUP_INVINCIBLE) color = '#ffcc00';
+                    if (this.type === POWERUP_MAGNET) color = '#00ffff';
+                    ctx.shadowColor = color;
+
+                    drawLegoBlock(ctx, -this.radius, -this.radius, this.radius*2, this.radius*2, color, '#333', '#fff');
+                    
+                    // 中央標誌符號
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 12px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    let sym = "?";
+                    if (this.type === POWERUP_SHRINK) sym = "S";
+                    if (this.type === POWERUP_INVINCIBLE) sym = "★";
+                    if (this.type === POWERUP_MAGNET) sym = "M";
+                    ctx.fillText(sym, 0, 0);
+                }
+                ctx.restore();
+            }
+        }
+
+        // --- 爆炸特效噴灑的樂高積木顆粒 ---
+        class Particle {
+            constructor(x, y, vx, vy, color, size, life) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.color = color;
+                this.size = size;
+                this.maxLife = life;
+                this.life = life;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.1; // 重力微調
+                this.life--;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.life / this.maxLife;
+                // 畫方形的小積木碎片
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+                ctx.restore();
+            }
+        }
+
+        function createExplosion(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                let angle = Math.random() * Math.PI * 2;
+                let speed = 1 + Math.random() * 5;
+                let vx = Math.cos(angle) * speed;
+                let vy = Math.sin(angle) * speed;
+                let size = 4 + Math.random() * 6;
+                particles.push(new Particle(x, y, vx, vy, color, size, 30 + Math.random() * 20));
+            }
+        }
+
+        // --- 初始化背景圖層 ---
+        function initBackgrounds() {
+            backgroundLayers = [
+                new BackgroundLayer(0.05, null, 'clouds'),
+                new BackgroundLayer(0.15, {base: '#2b3a4a', shadow: '#1c2631', light: '#3a4f65'}, 'skyline'), // 遠景大樓
+                new BackgroundLayer(0.4, {base: '#455a64', shadow: '#263238', light: '#607d8b'}, 'skyline')   // 近景大樓
+            ];
+        }
+
+        // --- 遊戲核心重置與循環 ---
+        function initGame() {
+            score = 0;
+            coins = 0;
+            frameCount = 0;
+            gameSpeed = 3.5;
+            pipes = [];
+            collectibles = [];
+            particles = [];
+            
+            scoreDisplay.textContent = "0";
+            coinsCountHud.textContent = "0";
+            powerupAnnouncer.style.display = "none";
+
+            bird = new Bird();
+            initBackgrounds();
+            
+            // 先生產第一個管子
+            pipes.push(new Pipe(canvas.width + 100));
+        }
+
+        function gameLoop() {
+            if (gameState !== STATE_PLAYING) return;
+
+            frameCount++;
+            // 隨著分數稍微加快遊戲節奏
+            gameSpeed = 3.5 + Math.min(3, score * 0.1);
+
+            // 清空畫布並填滿天空漸層
+            let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            skyGrad.addColorStop(0, '#a1c4fd');
+            skyGrad.addColorStop(1, '#c2e9fb');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 更新與繪製背景
+            backgroundLayers.forEach(layer => {
+                layer.update();
+                layer.draw();
+            });
+
+            // 管子生產邏輯 (每隔一定格數生產一個)
+            if (frameCount % 110 === 0) {
+                let px = canvas.width + 50;
+                let newPipe = new Pipe(px);
+                pipes.push(newPipe);
+
+                // 有機率在管子之間生成金幣或道具
+                if (Math.random() > 0.2) {
+                    let cy = newPipe.topHeight + newPipe.gap / 2;
+                    let type = POWERUP_NONE;
+                    let rand = Math.random();
+                    if (rand < 0.07) type = POWERUP_INVINCIBLE;
+                    else if (rand < 0.16) type = POWERUP_SHRINK;
+                    else if (rand < 0.25) type = POWERUP_MAGNET;
+                    
+                    collectibles.push(new Collectible(px + newPipe.width/2, cy, type));
+                }
+            }
+
+            // 更新與繪製管子
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                pipes[i].update();
+                pipes[i].draw();
+
+                // 得分判斷
+                if (!pipes[i].passed && pipes[i].x + pipes[i].width < bird.x) {
+                    pipes[i].passed = true;
+                    score++;
+                    scoreDisplay.textContent = score;
+                    sounds.playScore();
+                    // 噴出慶祝亮粉
+                    createExplosion(bird.x, bird.y - bird.radius, '#ffffff', 5);
+                }
+
+                // 碰撞判定
+                if (pipes[i].collidesWith(bird)) {
+                    endGame();
+                }
+
+                // 移除出鏡管子
+                if (pipes[i].x < -100) pipes.splice(i, 1);
+            }
+
+            // 更新與繪製收集品
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                collectibles[i].update();
+                collectibles[i].draw();
+                if (!collectibles[i].alive) collectibles.splice(i, 1);
+            }
+
+            // 更新與繪製道具 Banner 的計時顯示
+            if (bird.activePowerup !== POWERUP_NONE) {
+                let sec = (bird.powerupTimer / 60).toFixed(1);
+                let text = "";
+                if (bird.activePowerup === POWERUP_SHRINK) text = `縮小積木 🟢 (${sec}s)`;
+                if (bird.activePowerup === POWERUP_INVINCIBLE) text = `無敵衝刺 🚀 (${sec}s)`;
+                if (bird.activePowerup === POWERUP_MAGNET) text = `金幣磁鐵 🧲 (${sec}s)`;
+                powerupAnnouncer.textContent = text;
+            } else {
+                powerupAnnouncer.style.display = "none";
+            }
+
+            // 更新與繪製飛鳥
+            let hitGround = bird.update();
+            bird.draw();
+            if (hitGround) {
+                endGame();
+            }
+
+            // 更新與繪製特效顆粒
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].life <= 0) particles.splice(i, 1);
+            }
+
+            // 繪製最底層的樂高地板
+            drawLegoFloor();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function drawLegoFloor() {
+            // 地板基座
+            drawLegoBlock(ctx, 0, canvas.height - 40, canvas.width, 40, '#8bc34a', '#558b2f', '#aed581');
+            // 地板表面的褐色泥土拼裝層
+            ctx.fillStyle = '#795548';
+            ctx.fillRect(0, canvas.height - 15, canvas.width, 15);
+        }
+
+        function endGame() {
+            gameState = STATE_GAMEOVER;
+            sounds.playHit();
+            sounds.stopBGM();
+            createExplosion(bird.x, bird.y, '#ff3300', 25);
+            createExplosion(bird.x, bird.y, '#e53935', 15);
+
+            // 更新紀錄
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('lego_flappy_highscore', highScore);
+                highScoreHud.textContent = highScore;
+            }
+
+            // 彈出結算畫面
+            finalScore.textContent = score;
+            finalCoins.textContent = coins;
+            bestScore.textContent = highScore;
+            
+            gameOverOverlay.classList.remove('hidden');
+        }
+
+        // --- 事件監聽與控制 ---
+        function triggerJump() {
+            if (gameState === STATE_PLAYING) {
+                bird.jump();
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault(); // 防止網頁捲動
+                if (gameState === STATE_PLAYING) triggerJump();
+                else if (gameState === STATE_START) startBtn.click();
+                else if (gameState === STATE_GAMEOVER) restartBtn.click();
+            }
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            triggerJump();
+        }, { passive: false });
+
+        canvas.addEventListener('mousedown', (e) => {
+            triggerJump();
+        });
+
+        startBtn.addEventListener('click', () => {
+            sounds.init();
+            gameState = STATE_PLAYING;
+            startOverlay.classList.add('hidden');
+            initGame();
+            sounds.startBGM();
+            gameLoop();
+        });
+
+        restartBtn.addEventListener('click', () => {
+            gameState = STATE_PLAYING;
+            gameOverOverlay.classList.add('hidden');
+            initGame();
+            sounds.startBGM();
+            gameLoop();
+        });
+
+        audioToggle.addEventListener('click', () => {
+            sounds.init();
+            sounds.muted = !sounds.muted;
+            audioToggle.textContent = sounds.muted ? "❌" : "🔊";
+            if (sounds.muted) sounds.stopBGM();
+            else if (gameState === STATE_PLAYING) sounds.startBGM();
+        });
+
+        // 初始繪製開頭的地板以供裝飾
+        drawLegoFloor();
+    </script>
+</body>
+</html>
